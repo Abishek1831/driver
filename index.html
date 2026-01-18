@@ -597,7 +597,7 @@
             }
         }
 
-        function startTracking() {
+        async function startTracking() {
             selectedRouteId = document.getElementById('routeSelect').value;
             busCode = document.getElementById('busCode').value.trim();
             
@@ -611,7 +611,59 @@
                 return;
             }
 
-            if ("geolocation" in navigator) {
+            if (!("geolocation" in navigator)) {
+                showAlert('❌ GPS not supported on this device!', 'error');
+                return;
+            }
+
+            // ✅ STEP 1: Request permission explicitly first
+            try {
+                showAlert('📍 Requesting GPS permission...', 'success');
+                
+                // Try to get current position first (triggers permission dialog)
+                await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            console.log('✅ GPS Permission Granted!');
+                            showAlert('✅ GPS permission granted!', 'success');
+                            resolve(position);
+                        },
+                        (error) => {
+                            console.error('❌ GPS Permission Error:', error);
+                            
+                            if (error.code === error.PERMISSION_DENIED) {
+                                showAlert('❌ Location permission denied! Please enable in browser settings.', 'error');
+                                
+                                // Show detailed instructions
+                                setTimeout(() => {
+                                    alert(`📍 HOW TO ENABLE LOCATION:\n\n` +
+                                          `Chrome/Firefox:\n` +
+                                          `1. Click 🔒 lock icon in address bar\n` +
+                                          `2. Click "Site Settings"\n` +
+                                          `3. Find "Location" and set to "Allow"\n` +
+                                          `4. Refresh page and try again\n\n` +
+                                          `Safari (iPhone):\n` +
+                                          `1. Settings → Privacy → Location Services\n` +
+                                          `2. Enable Location Services\n` +
+                                          `3. Find Safari → Allow "While Using App"`);
+                                }, 500);
+                            } else if (error.code === error.POSITION_UNAVAILABLE) {
+                                showAlert('❌ GPS signal unavailable. Go outside or near window.', 'error');
+                            } else if (error.code === error.TIMEOUT) {
+                                showAlert('⚠️ GPS timeout. Trying again...', 'error');
+                            }
+                            
+                            reject(error);
+                        },
+                        {
+                            enableHighAccuracy: true,
+                            timeout: 15000,
+                            maximumAge: 0
+                        }
+                    );
+                });
+
+                // ✅ STEP 2: Permission granted, start continuous tracking
                 watchId = navigator.geolocation.watchPosition(
                     updateLocation,
                     handleError,
@@ -638,11 +690,15 @@
                 console.log('✅ GPS Started - Route:', selectedRouteId, 'Code:', busCode);
                 showAlert(`🚀 GPS tracking started! Code: ${busCode}`, 'success');
 
+                // Keep screen on
                 if ('wakeLock' in navigator) {
-                    navigator.wakeLock.request('screen').catch(() => {});
+                    navigator.wakeLock.request('screen')
+                        .then(() => console.log('✅ Screen wake lock active'))
+                        .catch(() => {});
                 }
-            } else {
-                showAlert('❌ GPS not supported!', 'error');
+                
+            } catch (error) {
+                console.error('GPS Start Error:', error);
             }
         }
 
@@ -780,5 +836,4 @@
         });
     </script>
 </body>
-
 </html>
