@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REC Bus Driver - GPS Tracker</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        /* Animated Background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: backgroundMove 20s linear infinite;
+            z-index: 0;
+        }
+        
+        @keyframes backgroundMove {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+        
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 30px;
+            padding: 35px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            position: relative;
+            z-index: 1;
+        }
+        
+        .logo {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 64px;
+            animation: bounce 2s infinite;
+            filter: drop-shadow(0 5px 15px rgba(0,0,0,0.2));
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+        
+        h1 {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+            text-align: center;
+            font-size: 28px;
+            font-weight: 800;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 25px;
+            font-size: 14px;
+        }
+        
+        /* Alert Banner */
+        .alert {
+            padding: 15px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            display: none;
+            font-weight: 600;
+            animation: slideIn 0.5s ease;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .alert.success {
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+            color: white;
+        }
+        
+        .alert.error {
+            background: linear-gradient(135deg, #eb3349, #f45c43);
+            color: white;
+        }
+        
+        /* Connection Quality */
+        .connection-quality {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            gap: 6px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 15px;
+        }
+        
+        .signal-bar {
+            width: 10px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        
+        .signal-bar:nth-child(1) { height: 15px; }
+        .signal-bar:nth-child(2) { height: 25px; }
+        .signal-bar:nth-child(3) { height: 35px; }
+        .signal-bar:nth-child(4) { height: 45px; }
+        
+        .signal-bar.active {
+            background: white;
+            box-shadow: 0 0 10px rgba(255,255,255,0.8);
+        }
+        
+        /* Tracking Status */
+        .tracking-indicator {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border-radius: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(240, 147, 251, 0.4);
+            transition: all 0.3s;
+        }
+        
+        .tracking-indicator.active {
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+            animation: pulse-glow 2s infinite;
+            box-shadow: 0 10px 30px rgba(17, 153, 142, 0.4);
+        }
+        
+        @keyframes pulse-glow {
+            0%, 100% { 
+                box-shadow: 0 10px 30px rgba(17, 153, 142, 0.4);
+                transform: scale(1);
+            }
+            50% { 
+                box-shadow: 0 15px 40px rgba(17, 153, 142, 0.6);
+                transform: scale(1.02);
+            }
+        }
+        
+        .pulse {
+            width: 12px;
+            height: 12px;
+            background: white;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 1.5s infinite;
+            margin-left: 10px;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.3); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        
+        /* PIN Display */
+        .pin-display {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 25px;
+            border-radius: 20px;
+            text-align: center;
+            margin-bottom: 25px;
+            display: none;
+            animation: slideDown 0.5s ease;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+        
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .pin-display.active {
+            display: block;
+        }
+        
+        .pin-display h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            opacity: 0.9;
+        }
+        
+        .pin-display .pin {
+            font-size: 48px;
+            font-weight: bold;
+            letter-spacing: 12px;
+            font-family: 'Courier New', monospace;
+            text-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            animation: pinGlow 2s infinite;
+        }
+        
+        @keyframes pinGlow {
+            0%, 100% { text-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+            50% { text-shadow: 0 5px 25px rgba(255,255,255,0.5); }
+        }
+        
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+        
+        .stat-box {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            padding: 20px 12px;
+            border-radius: 18px;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .stat-box:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+        
+        .stat-box:nth-child(1) {
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+        }
+        
+        .stat-box:nth-child(2) {
+            background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%);
+        }
+        
+        .stat-box:nth-child(3) {
+            background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);
+        }
+        
+        .stat-box .value {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        
+        .stat-box .label {
+            font-size: 11px;
+            color: #666;
+            font-weight: 600;
+        }
+        
+        /* Status Cards */
+        .status {
+            background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);
+            padding: 25px;
+            border-radius: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 2px solid rgba(255,255,255,0.5);
+        }
+        
+        .status-item:last-child { border: none; }
+        
+        .status-label { 
+            color: #555; 
+            font-weight: 700;
+            font-size: 14px;
+        }
+        
+        .status-value { 
+            color: #333; 
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        /* Info Box */
+        .info-box {
+            background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+            padding: 20px;
+            border-radius: 18px;
+            margin-bottom: 25px;
+            border-left: 5px solid #fdcb6e;
+            box-shadow: 0 5px 15px rgba(253, 203, 110, 0.3);
+        }
+        
+        .info-box p {
+            margin: 8px 0;
+            font-size: 13px;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .info-box strong {
+            color: #d63031;
+        }
+        
+        /* Form Elements */
+        select, button, input {
+            width: 100%;
+            padding: 18px;
+            border-radius: 15px;
+            border: none;
+            font-size: 16px;
+            margin-bottom: 15px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        select, input {
+            background: white;
+            border: 3px solid #e0e0e0;
+            color: #333;
+        }
+        
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 5px rgba(102, 126, 234, 0.1);
+        }
+        
+        input {
+            text-align: center;
+            font-size: 32px;
+            font-weight: bold;
+            letter-spacing: 8px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        button:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.5);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button.stop {
+            background: linear-gradient(135deg, #eb3349, #f45c43);
+            box-shadow: 0 10px 30px rgba(235, 51, 73, 0.4);
+        }
+        
+        button.stop:hover {
+            box-shadow: 0 15px 40px rgba(235, 51, 73, 0.5);
+        }
+        
+        /* Responsive */
+        @media (max-width: 600px) {
+            .container {
+                padding: 25px;
+                border-radius: 25px;
+            }
+            
+            .logo {
+                font-size: 48px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+            
+            .stat-box .value {
+                font-size: 22px;
+            }
+            
+            .stat-box .label {
+                font-size: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🚌</div>
+        <h1>REC Bus Driver App</h1>
+        <p class="subtitle">Professional GPS Tracking System</p>
+        
+        <!-- Alert Banner -->
+        <div id="alertBanner" class="alert"></div>
+        
+        <!-- Connection Quality -->
+        <div class="connection-quality">
+            <div class="signal-bar" id="signal1"></div>
+            <div class="signal-bar" id="signal2"></div>
+            <div class="signal-bar" id="signal3"></div>
+            <div class="signal-bar" id="signal4"></div>
+        </div>
+        
+        <div id="trackingStatus" class="tracking-indicator">
+            ⭕ GPS Tracking Inactive
+        </div>
+
+        <div id="pinDisplay" class="pin-display">
+            <h3>🔑 Your Bus Code:</h3>
+            <div class="pin" id="displayPin">----</div>
+            <p style="font-size: 13px; margin-top: 12px; opacity: 0.9;">📱 Share this code with students</p>
+        </div>
+
+        <!-- Live Statistics -->
+        <div id="statsGrid" class="stats-grid" style="display: none;">
+            <div class="stat-box">
+                <div class="value" id="statDistance">0</div>
+                <div class="label">KM</div>
+            </div>
+            <div class="stat-box">
+                <div class="value" id="statDuration">0</div>
+                <div class="label">MINS</div>
+            </div>
+            <div class="stat-box">
+                <div class="value" id="statAvgSpeed">0</div>
+                <div class="label">KM/H</div>
+            </div>
+        </div>
+
+        <div class="status">
+            <div class="status-item">
+                <span class="status-label">📍 Route</span>
+                <span class="status-value" id="routeDisplay">Not Selected</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">🌐 Latitude</span>
+                <span class="status-value" id="latDisplay">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">🌐 Longitude</span>
+                <span class="status-value" id="lngDisplay">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">⚡ Speed</span>
+                <span class="status-value" id="speedDisplay">0 km/h</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">🎯 Accuracy</span>
+                <span class="status-value" id="accuracyDisplay">--</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">🕐 Last Update</span>
+                <span class="status-value" id="lastUpdate">Never</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">📤 Updates Sent</span>
+                <span class="status-value" id="updateCount">0</span>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <p><strong>📌 Quick Guide:</strong></p>
+            <p>1️⃣ Select your route number</p>
+            <p>2️⃣ Enter your 4-digit bus code</p>
+            <p>3️⃣ Click "Start GPS Tracking"</p>
+            <p>4️⃣ Keep app open during journey</p>
+            <p>5️⃣ Students can track you live! 🎯</p>
+        </div>
+
+        <select id="routeSelect">
+            <option value="">🚌 Select Your Route</option>
+            <option value="1">Route 19 - SP Kovil to REC</option>
+            <option value="2">Route 11A - Velachery to REC</option>
+            <option value="3">Route 1 - Anna Nagar to REC</option>
+            <option value="4">Route 1B - Adyar to REC</option>
+            <option value="5">Route 5 - T Nagar to REC</option>
+            <option value="6">Route 2 - Porur to REC</option>
+        </select>
+
+        <input type="text" id="busCode" placeholder="0000" maxlength="4" pattern="[0-9]{4}">
+
+        <button id="startBtn" onclick="startTracking()">▶️ Start GPS Tracking</button>
+        <button id="stopBtn" onclick="stopTracking()" style="display: none;" class="stop">⏹️ Stop Tracking</button>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBZ_h5BTak_YJ4AbhFLmSbStMvLh-f0Kl8",
+            authDomain: "rec-bus-tracking.firebaseapp.com",
+            databaseURL: "https://rec-bus-tracking-default-rtdb.firebaseio.com",
+            projectId: "rec-bus-tracking",
+            storageBucket: "rec-bus-tracking.firebasestorage.app",
+            messagingSenderId: "253152097589",
+            appId: "1:253152097589:web:7c8987b567a4d2303f487c"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        let watchId = null;
+        let selectedRouteId = null;
+        let updateCount = 0;
+        let busCode = '';
+        let startTime = null;
+        let totalDistance = 0;
+        let lastPosition = null;
+        let speedSamples = [];
+
+        document.getElementById('busCode').addEventListener('input', function(e) {
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
+
+        function showAlert(message, type = 'success') {
+            const banner = document.getElementById('alertBanner');
+            banner.textContent = message;
+            banner.className = `alert ${type}`;
+            banner.style.display = 'block';
+            setTimeout(() => {
+                banner.style.display = 'none';
+            }, 5000);
+        }
+
+        function updateConnectionQuality(accuracy) {
+            const bars = [
+                document.getElementById('signal1'),
+                document.getElementById('signal2'),
+                document.getElementById('signal3'),
+                document.getElementById('signal4')
+            ];
+            
+            let activeCount = 4;
+            if (accuracy > 50) activeCount = 1;
+            else if (accuracy > 30) activeCount = 2;
+            else if (accuracy > 15) activeCount = 3;
+            
+            bars.forEach((bar, index) => {
+                if (index < activeCount) {
+                    bar.classList.add('active');
+                } else {
+                    bar.classList.remove('active');
+                }
+            });
+        }
+
+        function updateStats() {
+            if (!startTime) return;
+            
+            const duration = Math.floor((Date.now() - startTime) / 60000);
+            document.getElementById('statDuration').textContent = duration;
+            document.getElementById('statDistance').textContent = totalDistance.toFixed(2);
+            
+            if (speedSamples.length > 0) {
+                const avgSpeed = speedSamples.reduce((a, b) => a + b, 0) / speedSamples.length;
+                document.getElementById('statAvgSpeed').textContent = Math.round(avgSpeed);
+            }
+        }
+
+        function startTracking() {
+            selectedRouteId = document.getElementById('routeSelect').value;
+            busCode = document.getElementById('busCode').value.trim();
+            
+            if (!selectedRouteId) {
+                showAlert('⚠️ Please select your route first!', 'error');
+                return;
+            }
+
+            if (busCode.length !== 4) {
+                showAlert('⚠️ Please enter a 4-digit bus code!', 'error');
+                return;
+            }
+
+            if ("geolocation" in navigator) {
+                watchId = navigator.geolocation.watchPosition(
+                    updateLocation,
+                    handleError,
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    }
+                );
+
+                startTime = Date.now();
+                document.getElementById('trackingStatus').innerHTML = 
+                    '🟢 GPS Tracking Active <span class="pulse"></span>';
+                document.getElementById('trackingStatus').classList.add('active');
+                document.getElementById('startBtn').style.display = 'none';
+                document.getElementById('stopBtn').style.display = 'block';
+                document.getElementById('routeSelect').disabled = true;
+                document.getElementById('busCode').disabled = true;
+                
+                document.getElementById('pinDisplay').classList.add('active');
+                document.getElementById('displayPin').textContent = busCode;
+                document.getElementById('statsGrid').style.display = 'grid';
+
+                console.log('✅ GPS Started - Route:', selectedRouteId, 'Code:', busCode);
+                showAlert(`🚀 GPS tracking started! Code: ${busCode}`, 'success');
+
+                if ('wakeLock' in navigator) {
+                    navigator.wakeLock.request('screen').catch(() => {});
+                }
+            } else {
+                showAlert('❌ GPS not supported!', 'error');
+            }
+        }
+
+        function stopTracking() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+
+            if (selectedRouteId) {
+                database.ref('buses/' + selectedRouteId).remove();
+            }
+
+            document.getElementById('trackingStatus').innerHTML = '⭕ GPS Tracking Inactive';
+            document.getElementById('trackingStatus').classList.remove('active');
+            document.getElementById('startBtn').style.display = 'block';
+            document.getElementById('stopBtn').style.display = 'none';
+            document.getElementById('routeSelect').disabled = false;
+            document.getElementById('busCode').disabled = false;
+            document.getElementById('pinDisplay').classList.remove('active');
+            document.getElementById('statsGrid').style.display = 'none';
+
+            updateCount = 0;
+            totalDistance = 0;
+            startTime = null;
+            lastPosition = null;
+            speedSamples = [];
+            
+            document.getElementById('updateCount').textContent = '0';
+
+            showAlert('⏹️ GPS stopped. Distance: ' + totalDistance.toFixed(2) + ' km', 'success');
+        }
+
+        function updateLocation(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const speed = position.coords.speed || 0;
+            const accuracy = position.coords.accuracy;
+            updateCount++;
+
+            if (lastPosition) {
+                const dist = calculateDistance(
+                    lastPosition.lat, lastPosition.lng,
+                    lat, lng
+                );
+                if (dist < 0.5) {
+                    totalDistance += dist;
+                }
+            }
+            lastPosition = { lat, lng };
+
+            const speedKmh = Math.round(speed * 3.6);
+            if (speedKmh > 0 && speedKmh < 150) {
+                speedSamples.push(speedKmh);
+                if (speedSamples.length > 30) speedSamples.shift();
+            }
+
+            document.getElementById('latDisplay').textContent = lat.toFixed(6);
+            document.getElementById('lngDisplay').textContent = lng.toFixed(6);
+            document.getElementById('speedDisplay').textContent = speedKmh + ' km/h';
+            document.getElementById('accuracyDisplay').textContent = Math.round(accuracy) + ' m';
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+            document.getElementById('updateCount').textContent = updateCount;
+
+            updateConnectionQuality(accuracy);
+            updateStats();
+
+            const busRef = database.ref('buses/' + selectedRouteId);
+            busRef.set({
+                routeId: selectedRouteId,
+                latitude: lat,
+                longitude: lng,
+                speed: speedKmh,
+                accuracy: accuracy,
+                timestamp: Date.now(),
+                lastUpdate: new Date().toISOString(),
+                updateCount: updateCount,
+                busCode: busCode,
+                totalDistance: totalDistance,
+                avgSpeed: speedSamples.length > 0 ? Math.round(speedSamples.reduce((a,b) => a+b, 0) / speedSamples.length) : 0
+            }).then(() => {
+                console.log('✅ Update #' + updateCount);
+            }).catch((error) => {
+                showAlert('⚠️ Update failed', 'error');
+            });
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        function handleError(error) {
+            if (error.code === error.TIMEOUT) return;
+            
+            let errorMsg = 'GPS Error: ';
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMsg = "❌ Enable location permission!";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMsg = "⚠️ Location unavailable";
+                    break;
+                default:
+                    errorMsg += error.message;
+            }
+            showAlert(errorMsg, 'error');
+        }
+
+        document.getElementById('routeSelect').addEventListener('change', function() {
+            const routeName = this.options[this.selectedIndex].text;
+            document.getElementById('routeDisplay').textContent = 
+                this.value ? routeName : 'Not Selected';
+        });
+
+        window.addEventListener('load', function() {
+            if ("geolocation" in navigator) {
+                showAlert('✅ GPS ready!', 'success');
+            } else {
+                showAlert('❌ GPS not supported!', 'error');
+            }
+        });
+
+        window.addEventListener('beforeunload', function (e) {
+            if (watchId) {
+                e.preventDefault();
+                e.returnValue = 'GPS tracking active. Leave?';
+            }
+        });
+    </script>
+</body>
+</html>
